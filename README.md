@@ -8,6 +8,7 @@ This is a python plugin for Nagios (written for Nagios 2 originally) that tries 
 Installation
 ------------
 Put check_http_tao into your plugins directory (e.g. `/usr/lib/nagios/plugins.local`), and then define some commands:
+
     define command{
             command_name tao_http
             command_line /usr/lib/nagios/plugins.local/check_http_tao $HOSTNAME$
