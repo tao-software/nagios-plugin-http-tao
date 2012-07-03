@@ -1,0 +1,50 @@
+#! /usr/bin/env python
+import httplib,sys
+
+def make_request (uri):
+  if "http://" in uri:
+    uri = uri.split("http://")[1]
+  if "/" in uri:
+    host = uri.split("/")[0]
+    selector = "/"+uri.split("/",1)[1]
+  else:
+    host = uri
+    selector = "/"
+  if sys.version_info < (2,6):
+    h = httplib.HTTPConnection (host)
+  else:
+    h = httplib.HTTPConnection (host,timeout=10)
+  h.request ("GET", selector)
+  r = h.getresponse()
+  headers = {}
+  for pair in r.getheaders():
+    headers[pair[0]] = pair[1]
+  return (r.status, r.reason, headers, r.read())
+
+def request_content (uri):
+  loop = 0
+  while loop < 30:
+    try:
+      response = make_request (uri.lower())
+    except Exception, e:
+      return (2, "HTTP_TAO CRITICAL: Unable to connect to %s: Exception %s " % (uri, e))
+
+    if 300 <= response[0] <= 400:
+      if not "location" in response[2]:
+        return (1, "HTTP_TAO WARNING: Unexpected response: %i %s" % (response[0],response[1]))
+      uri = response[2]["location"] if response[2]["location"].startswith ("http") else uri+response[2]["location"]
+      loop += 1
+    elif (response[0] == 200) or (len(sys.argv) > 2 and str(response[0]) in sys.argv[2:]):
+      return (0, "HTTP_TAO OK: Status Code %i, %i bytes read" % (response[0], len (response[3])))
+    else:
+      return (1, "HTTP_TAO WARNING: Unexpected response: %i %s" % (response[0],response[1]))
+
+  return (2, "HTTP_TAO CRITICAL: Loop limit reached after 30 redirects")
+
+if __name__ == "__main__":
+  if len (sys.argv) == 1:
+    print "USAGE: check_http_tao HOSTNAME list of allowed status codes\n\tWith HOSTNAME being the FQDN/IP of the target host, optionally followed by a list of accepted status codes (3xx will be attempted to resolve and 200 accepted by default)"
+    sys.exit (1)
+  retval = request_content (sys.argv[1])
+  print retval[1]
+  sys.exit(retval[0])
